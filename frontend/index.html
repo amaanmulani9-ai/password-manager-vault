@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VaultX — Password Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & Variables ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0a0c0f;
+    --surface:  #111318;
+    --card:     #16191f;
+    --border:   #252830;
+    --border2:  #2e3240;
+    --accent:   #00e5c3;
+    --accent2:  #7b5ea7;
+    --danger:   #ff4d6d;
+    --warn:     #ffb347;
+    --text:     #e8eaf0;
+    --muted:    #6b7080;
+    --mono:     "Space Mono", monospace;
+    --sans:     "DM Sans", sans-serif;
+    --radius:   10px;
+    --glow:     0 0 20px rgba(0,229,195,.18);
+    --trans:    .18s cubic-bezier(.4,0,.2,1);
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Layout ── */
+  #app { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 24px 0;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .logo {
+    padding: 0 24px 28px;
+    font-family: var(--mono);
+    font-size: 18px; font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo svg { width: 26px; height: 26px; }
+  .nav { flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 24px; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: var(--muted);
+    border-left: 3px solid transparent;
+    transition: var(--trans);
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  .nav-item.active {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(0,229,195,.06);
+  }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-footer {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted);
+  }
+  .status-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--accent);
+    margin-right: 6px; box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Main content ── */
+  .main {
+    flex: 1; overflow-y: auto;
+    padding: 32px 40px;
+    background: var(--bg);
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Search bar ── */
+  .search-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    width: 280px; transition: var(--trans);
+  }
+  .search-bar:focus-within { border-color: var(--accent); box-shadow: var(--glow); }
+  .search-bar svg { width: 15px; color: var(--muted); flex-shrink: 0; }
+  .search-bar input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-family: var(--sans); font-size: 14px;
+    width: 100%;
+  }
+  .search-bar input::placeholder { color: var(--muted); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 7px; border: none;
+    font-family: var(--sans); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: var(--trans);
+  }
+  .btn svg { width: 15px; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { opacity: .88; box-shadow: 0 0 14px rgba(0,229,195,.35); }
+  .btn-ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+  .btn-danger { background: rgba(255,77,109,.12); color: var(--danger); border: 1px solid rgba(255,77,109,.25); }
+  .btn-danger:hover { background: rgba(255,77,109,.22); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* ── Cards ── */
+  .vault-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .vault-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: var(--trans); animation: fadeIn .3s ease;
+    position: relative; overflow: hidden;
+  }
+  .vault-card::before {
+    content: ""; position: absolute; inset: 0 0 auto;
+    height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0; transition: var(--trans);
+  }
+  .vault-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .vault-card:hover::before { opacity: 1; }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .site-icon {
+    width: 38px; height: 38px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+  }
+  .card-actions { display: flex; gap: 6px; opacity: 0; transition: var(--trans); }
+  .vault-card:hover .card-actions { opacity: 1; }
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 6px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface); color: var(--muted); transition: var(--trans);
+  }
+  .icon-btn:hover { color: var(--text); background: var(--border); }
+  .icon-btn svg { width: 13px; }
+
+  .site-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .site-user { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .password-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border-radius: 6px; padding: 8px 12px;
+  }
+  .password-val {
+    font-family: var(--mono); font-size: 13px; flex: 1;
+    letter-spacing: 2px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: var(--trans);
+  }
+  .password-val.revealed { color: var(--text); letter-spacing: .5px; }
+  .card-label {
+    display: inline-block; margin-top: 10px;
+    font-size: 11px; padding: 2px 8px; border-radius: 20px;
+    background: rgba(123,94,167,.18); color: var(--accent2);
+    font-weight: 500;
+  }
+  .card-date { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex; gap: 16px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px; flex: 1;
+  }
+  .stat-val { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Modal ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    backdrop-filter: blur(4px); display: flex;
+    align-items: center; justify-content: center; z-index: 100;
+    animation: fadeOverlay .2s ease;
+  }
+  @keyframes fadeOverlay { from{opacity:0} to{opacity:1} }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 32px; width: 480px; max-width: 94vw;
+    box-shadow: 0 24px 80px rgba(0,0,0,.6);
+    animation: slideUp .25s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:none;opacity:1} }
+  .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* ── Form ── */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%; background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 14px; color: var(--text);
+    font-family: var(--sans); font-size: 14px; outline: none; transition: var(--trans);
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); box-shadow: var(--glow); }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+  .pw-field { position: relative; }
+  .pw-field input { padding-right: 42px; font-family: var(--mono); }
+  .pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    transition: var(--trans);
+  }
+  .pw-toggle:hover { color: var(--accent); }
+  .pw-toggle svg { width: 16px; }
+
+  /* ── Strength bar ── */
+  .strength-bar { height: 3px; border-radius: 2px; margin-top: 6px; background: var(--border); overflow: hidden; }
+  .strength-fill { height: 100%; border-radius: 2px; transition: width .4s, background .4s; }
+  .strength-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Generator page ── */
+  .gen-output {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 20px 24px;
+    font-family: var(--mono); font-size: 22px;
+    letter-spacing: 1px; color: var(--accent);
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; word-break: break-all;
+  }
+  .toggle-group { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .toggle-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; cursor: pointer;
+  }
+  .toggle-item input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+  .slider-wrap { margin-bottom: 20px; }
+  .slider-wrap label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+  .slider-wrap input[type=range] {
+    width: 100%; accent-color: var(--accent); margin-top: 8px;
+    height: 4px; border-radius: 2px;
+  }
+
+  /* ── Auth screen ── */
+  .auth-screen {
+    min-height: 100vh; display: flex;
+    align-items: center; justify-content: center;
+    background: var(--bg);
+  }
+  .auth-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 48px; width: 420px;
+    box-shadow: 0 40px 100px rgba(0,0,0,.5);
+    animation: slideUp .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .auth-logo {
+    text-align: center; margin-bottom: 32px;
+    font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--accent);
+  }
+  .auth-logo small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--sans); font-weight: 400; }
+  .auth-hex {
+    font-size: 52px; margin-bottom: 4px;
+  }
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 12px; text-align: center; }
+  .success-msg { color: var(--accent); font-size: 13px; margin-top: 12px; text-align: center; }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center; padding: 80px 20px; color: var(--muted);
+  }
+  .empty svg { width: 52px; opacity: .3; margin-bottom: 16px; }
+  .empty p { font-size: 15px; margin-bottom: 6px; }
+  .empty small { font-size: 13px; }
+
+  /* ── Toast ── */
+  .toast-wrap { position: fixed; bottom: 28px; right: 28px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
+  .toast {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 12px 18px;
+    font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    animation: toastIn .3s ease;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.success { border-color: var(--accent); }
+  .toast.error { border-color: var(--danger); }
+  @keyframes toastIn { from{transform:translateX(30px);opacity:0} to{transform:none;opacity:1} }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media(max-width:768px) {
+    .sidebar { display: none; }
+    .main { padding: 20px 16px; }
+    .stats-bar { flex-wrap: wrap; }
+    .vault-grid { grid-template-columns: 1fr; }
+    .modal { padding: 24px; }
+    .search-bar { width: 100%; }
+    .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────────
+// Default API base URL:
+// - Use 127.0.0.1 for localhost/file:// to avoid IPv6/::1 and empty-host edge cases.
+// - Otherwise, use the current hostname (handy for LAN testing).
+function apiBase() {
+  const isFile = location.protocol === 'file:';
+  let host = location.hostname;
+  if (isFile || !host || host === 'localhost' || host === '0.0.0.0') host = '127.0.0.1';
+  if (host.includes(':') && !host.startsWith('[')) host = `[${host}]`; // IPv6
+  return `http://${host}:8000/api`; // ← change to your deployed API URL
+}
+const API = apiBase();
+let token = localStorage.getItem('vx_token') || null;
+let currentPage = 'vault';
+let vaultData = [];
+let editingEntry = null;
+let searchQuery = '';
+
+// ── Icons ──────────────────────────────────────────────────────────────────────
+const ICONS = {
+  lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  vault: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v-2M12 17v-2M15 12h2M9 12H7"/></svg>`,
+  gen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2M19 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="4"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+};
+
+// ── API helpers ────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetch(API + path, { ...opts, headers: { ...headers, ...opts.headers } });
+  } catch (e) {
+    throw new Error('Network error: cannot reach the API. Open the app at http://127.0.0.1:8080 and confirm the API works at http://127.0.0.1:8000/api/health.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    let msg = `HTTP ${res.status}`;
+    if (typeof detail === 'string') {
+      msg = detail;
+    } else if (Array.isArray(detail)) {
+      const msgs = [...new Set(
+        detail
+          .map((d) => (typeof d === 'string' ? d : d?.msg || d?.message || ''))
+          .filter(Boolean)
+      )];
+      if (msgs.length) msg = msgs.join('; ');
+    } else if (typeof data?.message === 'string') {
+      msg = data.message;
+    }
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Clipboard ─────────────────────────────────────────────────────────────────
+async function copyText(text, label = 'Copied') {
+  await navigator.clipboard.writeText(text);
+  toast(label + ' to clipboard');
+}
+
+// ── Strength ──────────────────────────────────────────────────────────────────
+function strengthScore(pw) {
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (pw.length >= 12) s++;
+  if (/[A-Z]/.test(pw)) s++;
+  if (/[0-9]/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
+}
+const STRENGTH = ['Very Weak','Weak','Fair','Good','Strong'];
+const STRENGTH_COLORS = ['#ff4d6d','#ff7849','#ffb347','#7ec8e3','#00e5c3'];
+
+// ── Render ─────────────────────────────────────────────────────────────────────
+function render() {
+  const root = document.getElementById('app');
+  if (!token) { root.innerHTML = renderAuth(); return; }
+
+  root.innerHTML = `
+  <div id="app">
+    <aside class="sidebar">
+      <div class="logo">${ICONS.lock} VaultX</div>
+      <nav class="nav">
+        ${navItem('vault','Vault',ICONS.vault)}
+        ${navItem('generator','Generator',ICONS.gen)}
+        ${navItem('settings','Settings',ICONS.settings)}
+      </nav>
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>Connected
+        <br/><br/>
+        <button class="btn btn-ghost btn-sm" onclick="logout()" style="width:100%">
+          ${ICONS.logout} Sign out
+        </button>
+      </div>
+    </aside>
+    <main class="main" id="mainContent"></main>
+  </div>`;
+
+  renderPage();
+}
+
+function navItem(page, label, icon) {
+  return `<div class="nav-item ${currentPage === page ? 'active' : ''}" onclick="navigate('${page}')">
+    ${icon} ${label}
+  </div>`;
+}
+
+function navigate(page) {
+  currentPage = page;
+  render();
+  if (page === 'vault') loadVault();
+}
+
+function renderPage() {
+  const el = document.getElementById('mainContent');
+  if (currentPage === 'vault') el.innerHTML = renderVaultPage();
+  else if (currentPage === 'generator') el.innerHTML = renderGeneratorPage();
+  else if (currentPage === 'settings') el.innerHTML = renderSettingsPage();
+  if (currentPage === 'vault') loadVault();
+  if (currentPage === 'generator') initGenerator();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function renderAuth() {
+  return `
+  <div class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-hex">🔐</div>
+        VaultX
+        <small>Secure Password Manager v2</small>
+      </div>
+      <div id="authMode">
+        <div class="field">
+          <label>Master Password</label>
+          <div class="pw-field">
+            <input type="password" id="masterPw" placeholder="Enter your master password…"
+              onkeydown="if(event.key==='Enter')doLogin()" />
+            <button class="pw-toggle" onclick="toggleVis('masterPw',this)">${ICONS.eye}</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Unlock Vault</button>
+        <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--muted)">
+          First time? <a href="#" onclick="showSetup()" style="color:var(--accent)">Set master password</a>
+        </p>
+        <div id="authErr" class="error-msg"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function doLogin() {
+  const pw = document.getElementById('masterPw').value;
+  if (!pw) return;
+  try {
+    const data = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    token = data.access_token;
+    localStorage.setItem('vx_token', token);
+    currentPage = 'vault';
+    render();
+    loadVault();
+  } catch(e) {
+    document.getElementById('authErr').textContent = e.message;
+  }
+}
+
+function showSetup() {
+  document.getElementById('authMode').innerHTML = `
+    <div class="field">
+      <label>New Master Password (min 8 chars, 1 uppercase, 1 digit)</label>
+      <div class="pw-field">
+        <input type="password" id="newPw" placeholder="Choose a strong password…"
+          oninput="updateStrength(this.value,'setupStr','setupStrLabel')" />
+        <button class="pw-toggle" onclick="toggleVis('newPw',this)">${ICONS.eye}</button>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="setupStr"></div></div>
+      <div class="strength-label" id="setupStrLabel"></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doSetup()">Set Master Password</button>
+    <div id="authErr" class="error-msg"></div>
+    <div id="authOk" class="success-msg"></div>`;
+}
+
+async function doSetup() {
+  const pw = document.getElementById('newPw').value;
+  try {
+    await apiFetch('/auth/setup', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    document.getElementById('authOk').textContent = 'Master password set! You can now log in.';
+    setTimeout(() => { document.getElementById('app').innerHTML = renderAuth(); }, 1600);
+  } catch(e) {
+    document.getElementById('authErr').textContent = e.message;
+  }
+}
+
+function logout() {
+  token = null;
+  localStorage.removeItem('vx_token');
+  render();
+}
+
+// ── Vault page ────────────────────────────────────────────────────────────────
+function renderVaultPage() {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Your Vault</div>
+        <div class="page-sub" id="vaultSub">Loading…</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="search-bar">
+          ${ICONS.search}
+          <input type="text" placeholder="Search vault…" id="searchInput"
+            oninput="onSearch(this.value)" value="${searchQuery}" />
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          ${ICONS.plus} Add Entry
+        </button>
+      </div>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="vault-grid" id="vaultGrid"></div>`;
+}
+
+async function loadVault() {
+  try {
+    const q = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
+    vaultData = await apiFetch('/vault' + q);
+    renderVaultCards();
+  } catch(e) {
+    if (e.message.includes('401')) logout();
+    else toast(e.message, 'error');
+  }
+}
+
+function onSearch(v) {
+  searchQuery = v;
+  loadVault();
+}
+
+function renderVaultCards() {
+  const grid = document.getElementById('vaultGrid');
+  const sub = document.getElementById('vaultSub');
+  const stats = document.getElementById('statsBar');
+  if (!grid) return;
+
+  sub.textContent = `${vaultData.length} saved credential${vaultData.length !== 1 ? 's' : ''}`;
+  stats.innerHTML = `
+    <div class="stat-card"><div class="stat-val">${vaultData.length}</div><div class="stat-label">Total Entries</div></div>
+    <div class="stat-card"><div class="stat-val">${new Set(vaultData.map(e=>e.website.split('.').slice(-2).join('.'))).size}</div><div class="stat-label">Unique Sites</div></div>
+    <div class="stat-card"><div class="stat-val">${vaultData.filter(e=>{const d=new Date(e.updated_at);return (Date.now()-d)<30*86400*1000}).length}</div><div class="stat-label">Updated This Month</div></div>`;
+
+  if (!vaultData.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      ${ICONS.vault}<p>Your vault is empty</p><small>Click "Add Entry" to store your first password</small>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = vaultData.map(e => {
+    const letter = (e.label || e.website || '?')[0].toUpperCase();
+    const date = new Date(e.updated_at).toLocaleDateString();
+    return `
+    <div class="vault-card">
+      <div class="card-header">
+        <div class="site-icon">${letter}</div>
+        <div class="card-actions">
+          <button class="icon-btn" title="Copy password" onclick="copyEntryPassword(${e.id})">${ICONS.copy}</button>
+          <button class="icon-btn" title="Edit" onclick="openEditModal(${e.id})">${ICONS.edit}</button>
+          <button class="icon-btn" title="Delete" onclick="deleteEntry(${e.id})" style="color:var(--danger)">${ICONS.trash}</button>
+        </div>
+      </div>
+      <div class="site-name">${e.website}</div>
+      <div class="site-user">${e.username}</div>
+      <div class="password-row">
+        <span class="password-val" id="pwVal${e.id}">••••••••••••</span>
+        <button class="icon-btn" onclick="revealPassword(${e.id})">${ICONS.eye}</button>
+        <button class="icon-btn" onclick="copyEntryPassword(${e.id})">${ICONS.copy}</button>
+      </div>
+      ${e.label ? `<span class="card-label">${e.label}</span>` : ''}
+      <div class="card-date">Updated ${date}</div>
+    </div>`;
+  }).join('');
+}
+
+async function revealPassword(id) {
+  const el = document.getElementById(`pwVal${id}`);
+  if (el.classList.contains('revealed')) { el.textContent = '••••••••••••'; el.classList.remove('revealed'); return; }
+  try {
+    const data = await apiFetch(`/vault/${id}/password`);
+    el.textContent = data.password; el.classList.add('revealed');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function copyEntryPassword(id) {
+  try {
+    const data = await apiFetch(`/vault/${id}/password`);
+    await copyText(data.password, 'Password copied');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  try {
+    await apiFetch(`/vault/${id}`, { method: 'DELETE' });
+    toast('Entry deleted');
+    loadVault();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Add / Edit modal ──────────────────────────────────────────────────────────
+function openAddModal() { editingEntry = null; showEntryModal(); }
+function openEditModal(id) { editingEntry = vaultData.find(e => e.id === id); showEntryModal(); }
+
+function showEntryModal() {
+  const e = editingEntry;
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.id = 'entryOverlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-title">${e ? 'Edit Entry' : 'Add New Entry'}</div>
+      <div class="modal-sub">${e ? 'Update the credentials below' : 'Fill in the credentials to store'}</div>
+      <div class="field"><label>Website / App *</label>
+        <input type="text" id="fSite" placeholder="e.g. github.com" value="${e?.website||''}" /></div>
+      <div class="field"><label>Username / Email *</label>
+        <input type="text" id="fUser" placeholder="e.g. user@example.com" value="${e?.username||''}" /></div>
+      <div class="field"><label>Password ${e?'(leave blank to keep current)':''}</label>
+        <div class="pw-field">
+          <input type="password" id="fPw" placeholder="${e?'Unchanged':'Enter or generate below…'}"
+            oninput="updateStrength(this.value,'str','strLabel')" />
+          <button class="pw-toggle" onclick="toggleVis('fPw',this)">${ICONS.eye}</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="str"></div></div>
+        <div class="strength-label" id="strLabel"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="autoGenInModal()" style="margin-bottom:14px">
+        ${ICONS.gen} Auto-generate strong password
+      </button>
+      <div class="field"><label>Label (optional)</label>
+        <input type="text" id="fLabel" placeholder="e.g. Work Account" value="${e?.label||''}" /></div>
+      <div class="field"><label>Notes (optional)</label>
+        <textarea id="fNotes" placeholder="Additional info…">${e?.notes||''}</textarea></div>
+      <div id="modalErr" class="error-msg"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEntry()">${e ? 'Save Changes' : 'Add Entry'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function closeModal() { document.getElementById('entryOverlay')?.remove(); }
+
+async function autoGenInModal() {
+  try {
+    const data = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ length: 20 }) });
+    document.getElementById('fPw').value = data.password;
+    document.getElementById('fPw').type = 'text';
+    updateStrength(data.password,'str','strLabel');
+    toast('Password generated: ' + data.strength);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function saveEntry() {
+  const site = document.getElementById('fSite').value.trim();
+  const user = document.getElementById('fUser').value.trim();
+  const pw = document.getElementById('fPw').value;
+  const label = document.getElementById('fLabel').value.trim();
+  const notes = document.getElementById('fNotes').value.trim();
+
+  if (!site || !user) { document.getElementById('modalErr').textContent = 'Website and username are required.'; return; }
+
+  const body = { website: site, username: user, label: label || null, notes: notes || null };
+  if (pw) body.password = pw;
+
+  try {
+    if (editingEntry) {
+      await apiFetch(`/vault/${editingEntry.id}`, { method: 'PUT', body: JSON.stringify(body) });
+      toast('Entry updated');
+    } else {
+      await apiFetch('/vault', { method: 'POST', body: JSON.stringify(body) });
+      toast('Entry added');
+    }
+    closeModal();
+    loadVault();
+  } catch(e) {
+    document.getElementById('modalErr').textContent = e.message;
+  }
+}
+
+// ── Generator page ────────────────────────────────────────────────────────────
+function renderGeneratorPage() {
+  return `
+    <div class="page-header">
+      <div><div class="page-title">Password Generator</div>
+        <div class="page-sub">Generate cryptographically secure passwords</div></div>
+    </div>
+    <div style="max-width:560px">
+      <div class="gen-output">
+        <span id="genOut" style="flex:1">Click generate…</span>
+        <button class="icon-btn" onclick="copyGen()" title="Copy">${ICONS.copy}</button>
+      </div>
+      <div style="text-align:center;margin-bottom:8px">
+        <span id="genStrength" style="font-size:13px;color:var(--muted)"></span>
+      </div>
+      <div class="slider-wrap">
+        <label>Length <span id="lenVal">16</span></label>
+        <input type="range" id="lenRange" min="8" max="64" value="16"
+          oninput="document.getElementById('lenVal').textContent=this.value" />
+      </div>
+      <div class="toggle-group">
+        <label class="toggle-item"><input type="checkbox" id="gUpper" checked /> Uppercase (A–Z)</label>
+        <label class="toggle-item"><input type="checkbox" id="gDigits" checked /> Digits (0–9)</label>
+        <label class="toggle-item"><input type="checkbox" id="gSymbols" checked /> Symbols (!@#…)</label>
+        <label class="toggle-item"><input type="checkbox" id="gNoAmb" /> Exclude ambiguous</label>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="doGenerate()" style="flex:1">${ICONS.refresh} Generate</button>
+        <button class="btn btn-ghost" onclick="copyGen()">${ICONS.copy} Copy</button>
+      </div>
+    </div>`;
+}
+
+function initGenerator() { doGenerate(); }
+
+async function doGenerate() {
+  const body = {
+    length: parseInt(document.getElementById('lenRange').value),
+    use_uppercase: document.getElementById('gUpper').checked,
+    use_digits: document.getElementById('gDigits').checked,
+    use_symbols: document.getElementById('gSymbols').checked,
+    exclude_ambiguous: document.getElementById('gNoAmb').checked,
+  };
+  try {
+    const data = await apiFetch('/generate', { method: 'POST', body: JSON.stringify(body) });
+    document.getElementById('genOut').textContent = data.password;
+    const s = ['Very Weak','Weak','Fair','Good','Strong','Very Strong'].indexOf(data.strength);
+    document.getElementById('genStrength').style.color = STRENGTH_COLORS[Math.min(s,4)];
+    document.getElementById('genStrength').textContent = '⬡ ' + data.strength;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function copyGen() {
+  const pw = document.getElementById('genOut').textContent;
+  if (pw === 'Click generate…') return;
+  await copyText(pw, 'Password copied');
+}
+
+// ── Settings page ─────────────────────────────────────────────────────────────
+function renderSettingsPage() {
+  return `
+    <div class="page-header">
+      <div><div class="page-title">Settings</div>
+        <div class="page-sub">Security & preferences</div></div>
+    </div>
+    <div style="max-width:500px;display:flex;flex-direction:column;gap:16px">
+      <div class="vault-card">
+        <div class="site-name" style="margin-bottom:8px">Change Master Password</div>
+        <div class="field">
+          <label>Current Password</label>
+          <div class="pw-field"><input type="password" id="curPw" placeholder="Current password" />
+            <button class="pw-toggle" onclick="toggleVis('curPw',this)">${ICONS.eye}</button></div>
+        </div>
+        <div class="field">
+          <label>New Password</label>
+          <div class="pw-field"><input type="password" id="newPw2" placeholder="New password"
+            oninput="updateStrength(this.value,'str2','strLabel2')" />
+            <button class="pw-toggle" onclick="toggleVis('newPw2',this)">${ICONS.eye}</button></div>
+          <div class="strength-bar"><div class="strength-fill" id="str2"></div></div>
+          <div class="strength-label" id="strLabel2"></div>
+        </div>
+        <div id="settingsMsg" class="success-msg" style="margin-bottom:8px"></div>
+        <button class="btn btn-primary" onclick="changePw()">Update Password</button>
+      </div>
+      <div class="vault-card" style="border-color:rgba(255,77,109,.2)">
+        <div class="site-name" style="color:var(--danger);margin-bottom:6px">Danger Zone</div>
+        <div class="site-user" style="margin-bottom:14px">These actions cannot be undone.</div>
+        <button class="btn btn-danger" onclick="logout()">Sign Out of All Sessions</button>
+      </div>
+    </div>`;
+}
+
+async function changePw() {
+  const cur = document.getElementById('curPw').value;
+  const nw = document.getElementById('newPw2').value;
+  const msg = document.getElementById('settingsMsg');
+  msg.style.color = '';
+  try {
+    // verify current then change
+    const login = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ password: cur }) });
+    token = login.access_token;
+    localStorage.setItem('vx_token', token);
+    await apiFetch('/auth/change', { method: 'POST', body: JSON.stringify({ password: nw }) });
+    msg.style.color = 'var(--accent)';
+    msg.textContent = '✓ Password updated successfully';
+  } catch(e) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = e.message;
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function toggleVis(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.innerHTML = inp.type === 'password' ? ICONS.eye : ICONS.eyeOff;
+}
+
+function updateStrength(pw, barId, labelId) {
+  const bar = document.getElementById(barId);
+  const label = document.getElementById(labelId);
+  if (!bar || !label) return;
+  const s = strengthScore(pw);
+  bar.style.width = (s * 20) + '%';
+  bar.style.background = STRENGTH_COLORS[Math.min(s-1,4)] || 'var(--border)';
+  label.textContent = pw ? (STRENGTH[Math.min(s-1,4)] || 'Very Weak') : '';
+  label.style.color = STRENGTH_COLORS[Math.min(s-1,4)] || 'var(--muted)';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

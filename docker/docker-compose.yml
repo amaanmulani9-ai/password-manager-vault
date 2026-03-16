@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Dev-friendly defaults. For production: set ENV=production and provide
+      # JWT_SECRET + FERNET_KEY via an env file or your deployment platform.
+      - ENV=${ENV:-development}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - FERNET_KEY=${FERNET_KEY:-}
+      - FERNET_KEY_FILE=/data/fernet.key
+      - JWT_EXPIRE_MINUTES=60
+      - DATABASE_URL=sqlite:////data/vault.db
+      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,https://your-domain.com
+    volumes:
+      - vault_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ../frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  vault_data:

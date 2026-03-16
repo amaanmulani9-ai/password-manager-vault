@@ -1,0 +1,23 @@
+# Password Manager API — Python dependencies
+# Install: pip install -r requirements.txt
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# Database ORM
+sqlalchemy==2.0.36
+
+# Data validation
+pydantic==2.10.3
+
+# Security
+argon2-cffi==23.1.0          # Argon2id password hashing (OWASP recommended)
+python-jose[cryptography]==3.3.0  # JWT tokens
+cryptography==44.0.0          # Fernet encryption
+
+# HTTP form parsing (for future OAuth support)
+python-multipart==0.0.20
+
+# Production ASGI server (alternative to uvicorn for clustering)
+gunicorn==23.0.0
