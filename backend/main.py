@@ -57,13 +57,20 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_origins": settings.CORS_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# During local development the frontend is often served from arbitrary ports
+# (e.g. VS Code Live Server on :5500). Allow any localhost/127.0.0.1 origin
+# without needing to keep the port list in sync.
+if not settings.is_production:
+    cors_kwargs["allow_origin_regex"] = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # ── Simple in-memory rate limiter ─────────────────────────────────────────────
 _rate_store: dict[str, list[float]] = {}
