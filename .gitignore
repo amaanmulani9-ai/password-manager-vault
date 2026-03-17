@@ -9,6 +9,7 @@ __pycache__/
 venv/
 .env
 .env.*
+!.env.example
 
 # Local vault data / secrets
 vault.db
